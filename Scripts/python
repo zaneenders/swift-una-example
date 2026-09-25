@@ -1,0 +1,6 @@
+#!/bin/sh
+set -eu
+root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+exec "${UV:-uv}" run --no-project --python 3.10 \
+    --with-requirements "$root/una-sdk/Utilities/Scripts/app_packer/requirements.txt" \
+    -- python "$@"

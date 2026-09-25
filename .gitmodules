@@ -1,0 +1,3 @@
+[submodule "una-sdk"]
+	path = una-sdk
+	url = https://github.com/UNAWatch/una-sdk.git
