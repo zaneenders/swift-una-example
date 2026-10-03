@@ -6,7 +6,7 @@ Embedded Swift UNA Glance. Hardware untested.
 
 - macOS 13+, host Swift 6.2+
 - [swift.org Swift 6.4](https://www.swift.org/install/) with Embedded ARM support (not Xcode's Swift)
-- STM32CubeCLT 1.22.0, CMake, [uv](https://docs.astral.sh/uv/)
+- STM32CubeCLT 1.22.0, CMake, [uv](https://docs.astral.sh/uv/), `rsvg-convert` (`brew install librsvg`)
 
 ## Build / install
 
@@ -22,18 +22,9 @@ Or, with the watch connected:
 swift run UnaDev build-install
 ```
 
-SDK initialization and Python packaging are automatic. Output: `build/SwiftUnaExample_1.0.0.uapp`.
+SDK initialization, bird generation, and Python packaging are automatic. Output: `build/SwiftUnaExample_1.0.0.uapp`.
 
 Installation overwrites the existing package. No `sudo`. Eject, disconnect, restart the watch.
-
-## Regenerate bird
-
-Requires `rsvg-convert`.
-
-```sh
-rsvg-convert Resources/swift-bird.svg -o Resources/swift-bird.png
-swift run BirdGenerator
-```
 
 ## Test
 

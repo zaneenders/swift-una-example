@@ -98,7 +98,7 @@ struct Tools {
     guard FileManager.default.fileExists(atPath: root.appendingPathComponent("una-sdk/cmake/una-app.cmake").path) else {
       throw ToolError("UNA SDK missing. Run: git submodule update --init")
     }
-    for name in ["cmake", "uv", "arm-none-eabi-g++"] {
+    for name in ["cmake", "uv", "arm-none-eabi-g++", "rsvg-convert"] {
       print("\(name): \(try executable(name))")
     }
     let compiler = try swiftCompiler()
@@ -124,6 +124,8 @@ struct Tools {
       try await run("git", ["submodule", "update", "--init", "una-sdk"])
     }
     let compiler = try await checkBuildTools()
+    try await run("rsvg-convert", ["Resources/swift-bird.svg", "-o", "Resources/swift-bird.png"])
+    try await run("swift", ["run", "BirdGenerator"])
     try await run("cmake", ["-S", ".", "-B", "build", "-DSWIFTC=\(compiler)"])
     try await run("cmake", ["--build", "build", "--parallel", String(ProcessInfo.processInfo.activeProcessorCount)])
   }
