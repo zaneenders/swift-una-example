@@ -7,15 +7,6 @@
 
 #include <cstdint>
 
-namespace {
-extern "C" void printGlanceText(void *context, const uint8_t *text,
-                                uint32_t length) {
-  auto &control = *static_cast<SDK::Glance::ControlText *>(context);
-  control.print("%.*s", static_cast<int>(length),
-                reinterpret_cast<const char *>(text));
-}
-}
-
 void Service::run() {
   while (true) {
     SDK::MessageBase *message = nullptr;
@@ -24,41 +15,32 @@ void Service::run() {
 
     switch (message->getType()) {
     case SDK::MessageType::EVENT_GLANCE_START: {
-      const auto birdWidth = swift_bird_width();
-      const auto birdHeight = swift_bird_height();
+      logger.start();
       if (auto config =
               SDK::make_msg<SDK::Message::RequestGlanceConfig>(kernel)) {
-        if (config.send(100) && config.ok() && config->maxControls >= 2 &&
-            config->width >= birdWidth + 120 && config->height >= birdHeight) {
+        if (config.send(100) && config.ok() && config->maxControls >= 1 &&
+            config->width > 0 && config->height > 0) {
           form.setWidth(config->width);
           form.setHeight(config->height);
-          birdPixels.resize(static_cast<size_t>(birdWidth) * birdHeight);
-          if (swift_bird_copy(birdPixels.data(), birdPixels.size()) !=
-              birdPixels.size())
-            break;
-          bird = form.createImage();
-          bird.init({0, swift_bird_y(&state, config->height)},
-                    {birdWidth, birdHeight}, birdPixels.data());
           value = form.createText();
           value
-              .pos({birdWidth, 0},
-                   {static_cast<uint16_t>(config->width - birdWidth),
+              .pos({0, 0},
+                   {static_cast<uint16_t>(config->width),
                     static_cast<uint16_t>(config->height)})
               .font(GlanceFont_t::GLANCE_FONT_POPPINS_SEMIBOLD_30)
               .color(GlanceColor_t::GLANCE_COLOR_WHITE)
               .alignment(GlanceAlignH_t::GLANCE_ALIGN_H_CENTER);
-          swift_glance_render_text(&value, printGlanceText);
+          updateStatus();
         }
       }
       break;
     }
 
     case SDK::MessageType::EVENT_GLANCE_TICK:
+      logger.tick();
       if (form.size() == 0)
         break;
-      swift_glance_advance(&state);
-      bird.pos({0, swift_bird_y(&state, form.getHeight())});
-      swift_glance_render_text(&value, printGlanceText);
+      updateStatus();
       if (auto update =
               SDK::make_msg<SDK::Message::RequestGlanceUpdate>(kernel)) {
         update->name = APP_NAME;
@@ -69,8 +51,13 @@ void Service::run() {
       }
       break;
 
+    case SDK::MessageType::EVENT_SENSOR_LAYER_DATA:
+      logger.receive(*static_cast<SDK::Message::Sensor::EventData *>(message));
+      break;
+
     case SDK::MessageType::EVENT_GLANCE_STOP:
     case SDK::MessageType::COMMAND_APP_STOP:
+      logger.stop();
       kernel.comm.releaseMessage(message);
       return;
 
@@ -79,4 +66,9 @@ void Service::run() {
     }
     kernel.comm.releaseMessage(message);
   }
+}
+
+void Service::updateStatus() {
+  value.print("%s", logger.failed() ? "Log error" :
+              logger.connected() ? "MTB logging" : "Connecting");
 }

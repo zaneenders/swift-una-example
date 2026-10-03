@@ -1,22 +1,12 @@
 {
-  "originHash" : "7273652e6c6308bf2c6a9ee348ea323a5d36fd2fbbd3e667f9758c1c328bb8d2",
+  "originHash" : "6a86adc0eedee4e0acb432c4adc266a012e821b8fee1b76c50816c40f59891ed",
   "pins" : [
     {
-      "identity" : "h",
+      "identity" : "swift-fit",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/rarestype/h",
+      "location" : "https://github.com/zaneenders/swift-fit.git",
       "state" : {
-        "revision" : "aa3626829160917d4378330617971977cbd78f5b",
-        "version" : "1.0.1"
-      }
-    },
-    {
-      "identity" : "swift-png",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/tayloraswift/swift-png",
-      "state" : {
-        "revision" : "8a0bcd4df5e4b307c804937776a56dd6ecdf6396",
-        "version" : "4.5.1"
+        "revision" : "16d9e57a48464e5857c7b49e9a83fde0f8db202a"
       }
     },
     {
