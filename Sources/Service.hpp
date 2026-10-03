@@ -2,15 +2,20 @@
 
 #include "SDK/Glance/GlanceControl.hpp"
 #include "SDK/Kernel/Kernel.hpp"
+#include "SwiftBridge.hpp"
 
 class Service {
 public:
-    explicit Service(SDK::Kernel &kernel) : kernel(kernel) {}
+    explicit Service(SDK::Kernel &kernel) : kernel(kernel) { swift_glance_initialize(&state); }
+    Service(const Service &) = delete;
+    Service &operator=(const Service &) = delete;
     void run();
 
 private:
     SDK::Kernel &kernel;
     SDK::Glance::Form form;
     SDK::Glance::ControlText value;
-    uint32_t tick = 0;
+    SDK::Glance::ControlImage bird;
+    std::vector<uint8_t> birdPixels;
+    uint32_t state;
 };

@@ -44,8 +44,9 @@ add_custom_command(OUTPUT ${SWIFT_OBJECT}
         -Xfrontend -function-sections -Xfrontend -disable-stack-protector
         -Xcc -mcpu=cortex-m33 -Xcc -mfpu=fpv5-sp-d16 -Xcc -mfloat-abi=hard
         -parse-as-library -emit-object
-        ${CMAKE_CURRENT_SOURCE_DIR}/Sources/Heartbeat.swift -o ${SWIFT_OBJECT}
-    DEPENDS Sources/Heartbeat.swift
+        ${CMAKE_CURRENT_SOURCE_DIR}/Sources/Heartbeat.swift
+        ${CMAKE_CURRENT_SOURCE_DIR}/Sources/SwiftBird.swift -o ${SWIFT_OBJECT}
+    DEPENDS Sources/Heartbeat.swift Sources/SwiftBird.swift
     VERBATIM)
 set_source_files_properties(${SWIFT_OBJECT} PROPERTIES EXTERNAL_OBJECT TRUE GENERATED TRUE)
 
