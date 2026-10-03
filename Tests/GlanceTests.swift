@@ -29,6 +29,16 @@ struct GlanceTests {
             assert(copyBird(buffer.baseAddress!, 2304) == 2304)
         }
         assert(pixels.contains(0) && pixels.contains(0xC7))
+        var spanPixels = [UInt8](repeating: 0xAA, count: 2305)
+        spanPixels.withUnsafeMutableBufferPointer { buffer in
+            var short = MutableSpan(_unsafeElements: buffer.prefix(2303))
+            assert(copyBird(into: &short) == 0)
+            assert(buffer.allSatisfy { $0 == 0xAA })
+            var destination = MutableSpan(_unsafeElements: buffer)
+            assert(copyBird(into: &destination) == 2304)
+            assert(destination[2304] == 0xAA)
+        }
+        assert(Array(spanPixels.prefix(2304)) == pixels)
         print("Glance tests passed")
     }
 }

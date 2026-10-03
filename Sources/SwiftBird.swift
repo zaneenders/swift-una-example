@@ -2,9 +2,15 @@
 let birdWidth: UInt16 = 48
 let birdHeight: UInt16 = 48
 
-@_cdecl("swift_bird_copy")
+@c(swift_bird_copy)
 public func copyBird(_ destination: UnsafeMutablePointer<UInt8>, _ capacity: UInt32) -> UInt32 {
     guard capacity >= 2304 else { return 0 }
+    var pixels = MutableSpan(_unsafeStart: destination, count: 2304)
+    return copyBird(into: &pixels)
+}
+
+func copyBird(into destination: inout MutableSpan<UInt8>) -> UInt32 {
+    guard destination.count >= 2304 else { return 0 }
     destination[0] = 0x00
     destination[1] = 0x00
     destination[2] = 0x00

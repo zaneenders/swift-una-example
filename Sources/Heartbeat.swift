@@ -18,30 +18,45 @@ struct GlanceState {
 }
 
 // C++ provides storage; Swift owns its initialization and all state transitions.
-@_cdecl("swift_glance_initialize")
+@c(swift_glance_initialize)
 public func initializeGlance(_ tick: UnsafeMutablePointer<UInt32>) {
-    tick.pointee = 0
+    var storage = MutableSpan(_unsafeStart: tick, count: 1)
+    storage[0] = 0
 }
 
-@_cdecl("swift_glance_advance")
+@c(swift_glance_advance)
 public func advanceGlance(_ tick: UnsafeMutablePointer<UInt32>) {
-    var state = GlanceState(tick: tick.pointee)
+    var storage = MutableSpan(_unsafeStart: tick, count: 1)
+    var state = GlanceState(tick: storage[0])
     state.advance()
-    tick.pointee = state.tick
+    storage[0] = state.tick
 }
 
-@_cdecl("swift_glance_tick")
+@c(swift_glance_tick)
 public func glanceTick(_ tick: UnsafePointer<UInt32>) -> UInt32 {
-    tick.pointee
+    let storage = Span(_unsafeStart: tick, count: 1)
+    return storage[0]
 }
 
-@_cdecl("swift_bird_width")
+@c(swift_bird_width)
 public func swiftBirdWidth() -> UInt16 { birdWidth }
 
-@_cdecl("swift_bird_height")
+@c(swift_bird_height)
 public func swiftBirdHeight() -> UInt16 { birdHeight }
 
-@_cdecl("swift_bird_y")
+@c(swift_bird_y)
 public func swiftBirdY(_ tick: UnsafePointer<UInt32>, _ height: UInt16) -> UInt16 {
-    GlanceState(tick: tick.pointee).birdY(height: height)
+    let storage = Span(_unsafeStart: tick, count: 1)
+    return GlanceState(tick: storage[0]).birdY(height: height)
+}
+
+@c(swift_glance_render_text)
+public func renderGlanceText(
+    _ context: UnsafeMutableRawPointer,
+    _ printText: @convention(c) (UnsafeMutableRawPointer, UnsafePointer<UInt8>, UInt32) -> Void
+) {
+    let text: StaticString = "zane was here"
+    text.withUTF8Buffer { bytes in
+        printText(context, bytes.baseAddress!, UInt32(bytes.count))
+    }
 }
