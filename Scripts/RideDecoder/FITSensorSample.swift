@@ -31,15 +31,18 @@ struct FITSensorSample: Equatable {
   static let messageNumber: UInt16 = 0xFF00
   static let developerIndex: UInt8 = 0
 
+  static func isSensorMessage(_ number: UInt16) -> Bool {
+    number == messageNumber || (0xFF01...0xFF08).contains(number)
+  }
+
   let timestampMicroseconds: UInt64
   let stream: SensorStream
   let validity: SampleValidity
   let channels: [Float]
 
   init(message: Message) throws {
-    guard message.globalMessageNumber == Self.messageNumber,
+    guard Self.isSensorMessage(message.globalMessageNumber),
       message.fields.count == SensorField.allCases.count,
-      Set(message.fields.map(\.fieldDefinitionNumber)) == Set(SensorField.allCases.map(\.rawValue)),
       message.fields.allSatisfy({ $0.developerDataIndex == Self.developerIndex && $0.values.count == 1 })
     else { throw DecodeError(description: "Invalid MTB sample schema") }
 
@@ -55,10 +58,19 @@ struct FITSensorSample: Equatable {
     else {
       throw DecodeError(description: "Unknown sensor stream or validity flag")
     }
+    let legacy = message.globalMessageNumber == Self.messageNumber
+    guard legacy || message.globalMessageNumber == 0xFF00 + UInt16(stream.rawValue) else {
+      throw DecodeError(description: "Sensor message and stream disagree")
+    }
+    let channelStart: UInt8 = legacy ? 3 : UInt8(10 + (stream.rawValue - 1) * 6)
+    let expectedFields = Set([UInt8(0), 1, 2] + (0..<6).map { channelStart + UInt8($0) })
+    guard Set(message.fields.map(\.fieldDefinitionNumber)) == expectedFields else {
+      throw DecodeError(description: "Invalid sensor channel mapping")
+    }
     self.stream = stream
     self.validity = validity
-    channels = try SensorField.channels.map { field in
-      guard case .float32(let value) = message.firstValue(number: field.rawValue) else {
+    channels = try (0..<6).map { channel in
+      guard case .float32(let value) = message.firstValue(number: channelStart + UInt8(channel)) else {
         throw SampleDecodingError.invalidFieldType
       }
       return value

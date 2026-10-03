@@ -16,6 +16,32 @@ import Testing
   try validateRideRecords(fit)
   try validateActivityMetadata(fit)
   let ride = try RideData(bytes: bytes)
+  #expect(ride.schemaVersion == 2)
+  #expect(ride.requestedPeriodsMilliseconds == [20, 20, 1000, 1000, 100, 50, 1000, 0])
+  let expectedNames = [
+    ["accel_x", "accel_y", "accel_z", "reserved", "reserved", "reserved"],
+    ["gyro_x", "gyro_y", "gyro_z", "reserved", "reserved", "reserved"],
+    ["latitude", "longitude", "gps_altitude", "precision", "reserved", "reserved"],
+    ["speed", "reserved", "reserved", "reserved", "reserved", "reserved"],
+    ["pressure", "reference_pressure", "barometric_altitude", "reserved", "reserved", "reserved"],
+    ["mag_x", "mag_y", "mag_z", "mag_calibrated", "reserved", "reserved"],
+    ["distance", "reserved", "reserved", "reserved", "reserved", "reserved"],
+    ["utc_high16", "utc_low16", "reserved", "reserved", "reserved", "reserved"],
+  ]
+  let expectedUnits = [
+    ["driver-native", "driver-native", "driver-native", "", "", ""],
+    ["driver-native", "driver-native", "driver-native", "", "", ""],
+    ["deg", "deg", "m", "m", "", ""], ["m/s", "", "", "", "", ""],
+    ["Pa", "Pa", "m", "", "", ""], ["uT", "uT", "uT", "bool", "", ""],
+    ["m", "", "", "", "", ""], ["UTC seconds high16", "UTC seconds low16", "", "", "", ""],
+  ]
+  for stream in 0..<8 {
+    for channel in 0..<6 {
+      let key = DeveloperFieldKey(developerDataIndex: 0, fieldDefinitionNumber: UInt8(10 + stream * 6 + channel))
+      #expect(ride.channelMetadata[key]?.name == expectedNames[stream][channel])
+      #expect(ride.channelMetadata[key]?.units == expectedUnits[stream][channel])
+    }
+  }
   #expect(ride.samples.count == expectedSamples.count)
   for expected in expectedSamples {
     let stats = ride.statistics(for: expected.stream)
@@ -42,22 +68,14 @@ private func validateDeveloperMetadata(_ fit: FITFile) throws {
         0, 0, 0, 0, 0, 0, 0, 0,
       ].map { .byte(UInt8($0)) })
 
-  let fields: [(name: String, type: BaseType)] = [
-    ("sensor_time_us", .uint64), ("stream", .uint32), ("valid", .uint32),
-    ("a", .float32), ("b", .float32), ("c", .float32),
-    ("d", .float32), ("e", .float32), ("f", .float32),
-  ]
-  for (index, field) in fields.enumerated() {
-    let key = DeveloperFieldKey(
-      developerDataIndex: FITSensorSample.developerIndex, fieldDefinitionNumber: SensorField.allCases[index].rawValue)
-    let definition = try #require(fit.developerFieldDefinitions[key])
-    #expect(definition.fieldName == field.name)
-    #expect(definition.baseType == field.type)
-  }
+  let key = DeveloperFieldKey(developerDataIndex: 0, fieldDefinitionNumber: 0)
+  #expect(fit.developerFieldDefinitions[key]?.fieldName == "sensor_time_us")
+  #expect(fit.developerFieldDefinitions.count == 51)
+
 }
 
 private func validateSensorSamples(_ fit: FITFile) throws {
-  let messages = fit.messages.filter { $0.globalMessageNumber == FITSensorSample.messageNumber }
+  let messages = fit.messages.filter { FITSensorSample.isSensorMessage($0.globalMessageNumber) }
   let samples = try messages.map { try FITSensorSample(message: $0) }
   #expect(samples.count == expectedSamples.count)
   for (sample, expected) in zip(samples, expectedSamples) {

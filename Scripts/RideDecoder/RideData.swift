@@ -3,12 +3,39 @@ import SwiftFit
 
 struct RideData {
   let samples: [FITSensorSample]
+  let schemaVersion: UInt16
+  let requestedPeriodsMilliseconds: [UInt32]
+  let channelMetadata: [DeveloperFieldKey: (name: String, units: String)]
 
   init(bytes: Data) throws {
     let options = FITDecodeOptions(validateFileCRC: true, validateHeaderCRC: true)
     let fit = try FITFile(bytes: Array(bytes), options: options)
+    let configuration = fit.messages.first { $0.globalMessageNumber == 0xFF10 }
+    schemaVersion = configuration?.uint16Field(number: 0) ?? 1
+    guard schemaVersion == 1 || schemaVersion == 2 else {
+      throw DecodeError(description: "Unsupported ride schema version")
+    }
+    requestedPeriodsMilliseconds =
+      configuration?.field(number: 1)?.values.compactMap {
+        if case .uint32(let period) = $0 { return period }
+        return nil
+      } ?? []
+    if schemaVersion == 2 && requestedPeriodsMilliseconds.count != 8 {
+      throw DecodeError(description: "Invalid sensor configuration")
+    }
+    // FIT field_description units is field 8; the pinned SwiftFit convenience map uses 6.
+    var metadata: [DeveloperFieldKey: (name: String, units: String)] = [:]
+    for message in fit.messages where message.globalMessageNumber == 206 {
+      if let index = message.uint8Field(number: 0), let field = message.uint8Field(number: 1),
+        let name = message.stringField(number: 3)
+      {
+        metadata[DeveloperFieldKey(developerDataIndex: index, fieldDefinitionNumber: field)] =
+          (name, message.stringField(number: 8) ?? "")
+      }
+    }
+    channelMetadata = metadata
     samples = try fit.messages
-      .filter { $0.globalMessageNumber == FITSensorSample.messageNumber }
+      .filter { FITSensorSample.isSensorMessage($0.globalMessageNumber) }
       .map { try FITSensorSample(message: $0) }
     guard !samples.isEmpty else {
       throw DecodeError(description: "FIT file contains no MTB sensor samples")

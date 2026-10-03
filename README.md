@@ -1,6 +1,8 @@
-# MTB Logger
+# SpeederBikes
 
-Embedded Swift MTB sensor logger for UNA Watch. Hardware untested.
+Embedded Swift MTB sensor logger for UNA Watch. Hardware validation in progress.
+The launcher name is **SpeederBikes**; the package filename, app ID and
+`Apps/SwiftUnaExample/Rides` storage path remain unchanged for upgrade compatibility.
 
 ## Requirements
 
@@ -41,21 +43,29 @@ C++ writer with SwiftFit. No watch writes. The round-trip test requires `clang++
 ## MTB logger prototype
 
 The app now has a full-screen, physical-button GUI and a separate recording
-service. Opening it does not start recording. **R1 (top right)** starts a ride;
+service. Opening it pre-acquires GPS location/speed but does not create a file or start
+recording. The acquired fix is preserved when recording starts. GPS is released
+after save or when leaving without recording; missing subscriptions retry each
+service tick. **R1 (top right)** starts a ride;
 while recording, press R1 twice to stop and confirm saving. **R2 (bottom right)**
 cancels a pending save, or closes the GUI. Recording continues with the GUI
 closed/suspended; reopen the app to see current state and stop/save. The service
 paces recording on its own one-second clock, independent of screen ticks.
 
-Dashboard: recording state, elapsed timer, GPS-fix freshness, maximum GPS speed
-in km/h (resets on start, retained after save; `--` until a valid reading), accelerometer and
-gyro valid-sample counts, and LIVE/WAIT indicators (stale after two seconds).
-`FIT SAVED` is shown only after finalization and file flush/close succeed; errors
-show `SAVE/LOG ERROR`. `JUMPS NOT ENABLED` is intentional: no validated jump
-classifier or airtime score exists yet. First validate sensor logs, then tune
+The main page shows a larger MM:SS timer (HH:MM:SS after an hour), a GPS
+latitude/longitude when GPS has a fresh fix (green), GPS WAIT without a fix
+(yellow), and small side-by-side ACC/GYRO health indicators without sample counts. IMU
+labels are green while receiving, yellow before first data, red when stale
+during recording, muted after save; no LIVE/WAIT text for the IMU. UP/DOWN switches
+to a dedicated maximum-speed page (km/h), without affecting recording. The top
+status dot is green while recording, amber when ready, white after saving, red
+on error. Saved/error states also have explicit text; the app name and recording
+heading are omitted. `FIT SAVED` appears only after successful finalization and
+file flush/close. Jump detection is offline only; no jump label is displayed.
+First validate sensor logs, then tune
 against labeled rides. Hardware behavior, button routing, display layout,
 background residency and power use remain unverified. The GUI requires an
-8-bit ABGR2222 display. There is no touchscreen interface in this prototype.
+ABGR2222 display (6-bit color or 8-bit depth, stored as one byte per pixel). There is no touchscreen interface in this prototype.
 
 Requested streams (all samples in each batch are retained):
 
@@ -150,3 +160,24 @@ Button-control test:
 clang++ -std=c++17 -I Sources -I una-sdk/Libs/Header Tests/RideControlsTests.cpp -o /tmp/una-controls-tests
 /tmp/una-controls-tests
 ```
+
+### Self-describing sensor metadata (schema 2)
+
+New FIT recordings contain per-stream developer fields (`accel_x`, `gyro_x`,
+`pressure`, `latitude`, etc.) with units and distinct field numbers. Unknown IMU
+units are explicitly `driver-native`; no conversion or filtering is applied.
+Magnetic fields use documented µT, pressure Pa, GPS degrees/metres and speed m/s.
+Clock anchors retain high/low 16-bit UTC-second halves and uptime microseconds.
+Private configuration message 0xFF10 stores schema version 2 and eight requested
+periods in stream-ID order (zero for the independently paced service tick).
+Private sensor messages are 0xFF01–0xFF08; the typed Swift parser also recognizes
+older 0xFF00 recordings. The legacy streaming decoder only handles schema 1;
+use the SwiftFit-backed CLI for new recordings.
+
+`RideData.channelMetadata` exposes channel names/units and
+`requestedPeriodsMilliseconds` exposes requested configuration. The pinned
+SwiftFit library decodes these messages without modification. Its convenience
+units accessor currently uses field 6, whereas FIT field_description units is
+field 8; our parser reads field 8 directly from the decoded message. No changes
+to the swift-fit repository are needed. Physical IMU units still require a
+stationary/controlled-motion check before detection thresholds are chosen.

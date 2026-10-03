@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 set(APP_NAME "SwiftUnaExample")
-set(APP_USER_NAME "MTB Logger")
+set(APP_USER_NAME "SpeederBikes")
 set(APP_FILE_NAME "SwiftUnaExample")
 set(APP_TYPE "Activity")
 set(DEV_ID "UNA")

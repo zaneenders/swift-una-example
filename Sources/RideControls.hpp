@@ -3,6 +3,9 @@
 
 class RideControls {
 public:
+  enum class Page { Ride, Speed };
+  Page page() const { return currentPage; }
+  void changePage() { currentPage = currentPage == Page::Ride ? Page::Speed : Page::Ride; }
   enum class Action { None, Start, Save };
   bool confirmingSave() const { return confirmSave; }
   void cancel() { confirmSave = false; }
@@ -20,4 +23,5 @@ public:
   }
 private:
   bool confirmSave = false;
+  Page currentPage = Page::Ride;
 };

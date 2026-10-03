@@ -12,6 +12,7 @@ class RideLogger {
 public:
   explicit RideLogger(SDK::Kernel &kernel) : kernel(kernel) {}
   ~RideLogger() { stop(); }
+  void prepareGps();
   bool start();
   void stop();
   void receive(const SDK::Message::Sensor::EventData &event);
@@ -45,7 +46,9 @@ private:
   unsigned ticks = 0;
   uint32_t accelerationCount = 0, gyroCount = 0;
   uint32_t lastAccelerationMs = 0, lastGyroMs = 0;
+  float accelerationMagnitude = 0, gyroMagnitude = 0;
   uint32_t elapsedMs = 0;
   bool saved = false;
+  bool gpsWanted = false;
   MaximumSpeed maximumSpeed;
 };

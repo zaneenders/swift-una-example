@@ -15,18 +15,47 @@ bool RideFitWriter::begin(uint32_t utc) {
   writer.defineMessage(1, 207, {{1,B::Byte,16},{3,B::UInt8}});
   const uint8_t app[16] = {0xE8,0x7D,0x0A,0x49,0xF3,0xB1,0x5C,0x62};
   writer.data(1).bytes(app,16).u8(0).write();
-  const char *names[] = {"sensor_time_us","stream","valid","a","b","c","d","e","f"};
-  for (uint8_t field = 0; field < 9; ++field) {
-    const auto type = field == 0 ? B::UInt64 : field < 3 ? B::UInt32 : B::Float32;
-    const auto length = static_cast<uint8_t>(std::strlen(names[field])+1);
+  const auto describe = [this](uint8_t field, const char *name, const char *units, B type) {
+    const auto nameLength = static_cast<uint8_t>(std::strlen(name)+1);
+    const auto unitLength = static_cast<uint8_t>(std::strlen(units)+1);
     writer.defineMessage(2,206,{{0,B::UInt8},{1,B::UInt8},{2,B::UInt8},
-                              {3,B::String,length}});
+                              {3,B::String,nameLength},{8,B::String,unitLength}});
     writer.data(2).u8(0).u8(field).u8(static_cast<uint8_t>(type))
-      .str(names[field],length).write();
+      .str(name,nameLength).str(units,unitLength).write();
+  };
+  describe(0,"sensor_time_us","us",B::UInt64);
+  describe(1,"stream","id",B::UInt32);
+  describe(2,"valid","bool",B::UInt32);
+  const char *names[8][6] = {
+    {"accel_x","accel_y","accel_z","reserved","reserved","reserved"},
+    {"gyro_x","gyro_y","gyro_z","reserved","reserved","reserved"},
+    {"latitude","longitude","gps_altitude","precision","reserved","reserved"},
+    {"speed","reserved","reserved","reserved","reserved","reserved"},
+    {"pressure","reference_pressure","barometric_altitude","reserved","reserved","reserved"},
+    {"mag_x","mag_y","mag_z","mag_calibrated","reserved","reserved"},
+    {"distance","reserved","reserved","reserved","reserved","reserved"},
+    {"utc_high16","utc_low16","reserved","reserved","reserved","reserved"}
+  };
+  const char *units[8][6] = {
+    {"driver-native","driver-native","driver-native","","",""},
+    {"driver-native","driver-native","driver-native","","",""},
+    {"deg","deg","m","m","",""}, {"m/s","","","","",""},
+    {"Pa","Pa","m","","",""}, {"uT","uT","uT","bool","",""},
+    {"m","","","","",""}, {"UTC seconds high16","UTC seconds low16","","","",""}
+  };
+  for (uint8_t stream = 0; stream < 8; ++stream) {
+    const uint8_t first = 10 + stream * 6;
+    for (uint8_t channel = 0; channel < 6; ++channel)
+      describe(first+channel,names[stream][channel],units[stream][channel],B::Float32);
+    writer.defineMessage(8+stream,0xFF01+stream,{},
+      {{0,8,0},{1,4,0},{2,4,0},{first,4,0},{static_cast<uint8_t>(first+1),4,0},
+       {static_cast<uint8_t>(first+2),4,0},{static_cast<uint8_t>(first+3),4,0},
+       {static_cast<uint8_t>(first+4),4,0},{static_cast<uint8_t>(first+5),4,0}});
   }
-  // Private manufacturer message rather than thousands of standard ride records.
-  writer.defineMessage(3,0xFF00,{},{{0,8,0},{1,4,0},{2,4,0},{3,4,0},{4,4,0},
-                                  {5,4,0},{6,4,0},{7,4,0},{8,4,0}});
+  // Schema v2; requested periods (ms) in stream-ID order. Zero means service tick.
+  writer.defineMessage(3,0xFF10,{{0,B::UInt16},{1,B::UInt32,8}});
+  writer.data(3).u16(2).u32(20).u32(20).u32(1000).u32(1000)
+    .u32(100).u32(50).u32(1000).u32(0).write();
   writer.defineMessage(4,20,{{253,B::UInt32},{0,B::SInt32},{1,B::SInt32},
                             {78,B::UInt32},{73,B::UInt32}});
   writer.defineMessage(5,21,{{253,B::UInt32},{0,B::Enum},{1,B::Enum}});
@@ -39,7 +68,11 @@ bool RideFitWriter::begin(uint32_t utc) {
 }
 
 bool RideFitWriter::sample(const uint8_t *encoded) {
-  return writer.data(3).bytes(encoded,40).write();
+  const uint32_t stream = static_cast<uint32_t>(encoded[8]) |
+    static_cast<uint32_t>(encoded[9]) << 8 | static_cast<uint32_t>(encoded[10]) << 16 |
+    static_cast<uint32_t>(encoded[11]) << 24;
+  if (stream < 1 || stream > 8) return false;
+  return writer.data(static_cast<uint8_t>(7+stream)).bytes(encoded,40).write();
 }
 
 bool RideFitWriter::record(uint32_t utc, bool fix, float latitude, float longitude,

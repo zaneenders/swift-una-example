@@ -1,4 +1,5 @@
 #include "Gui.hpp"
+#include "DisplayConfiguration.hpp"
 #include "SDK/Messages/CommandMessages.hpp"
 #include "SDK/Messages/MessageGuard.hpp"
 #include <algorithm>
@@ -22,8 +23,7 @@ const uint8_t glyphs[][5] = {
 };
 }
 
-void Gui::text(int x, int y, const char *label, uint8_t color) {
-  const int scale = width >= 200 ? 2 : 1;
+void Gui::text(int x, int y, const char *label, uint8_t color, int scale) {
   for (; *label; ++label, x += 6 * scale) {
     const char *found = std::strchr(alphabet, *label);
     if (!found) continue;
@@ -40,34 +40,83 @@ void Gui::text(int x, int y, const char *label, uint8_t color) {
   }
 }
 
+void Gui::centered(int y, const char *label, uint8_t color, int scale) {
+  centeredAt(width / 2, y, width * 3 / 4, label, color, scale);
+}
+
+void Gui::centeredAt(int centerX, int y, int availableWidth, const char *label, uint8_t color, int scale) {
+  const int length = static_cast<int>(std::strlen(label));
+  while (scale > 1 && length * 6 * scale > availableWidth) --scale;
+  const int textWidth = length ? (length * 6 - 1) * scale : 0;
+  text(centerX - textWidth / 2, y, label, color, scale);
+}
+
 void Gui::draw() {
   if (!visible || pixels.empty()) return;
+  constexpr uint8_t white = 0xFF, muted = 0xEA, green = 0xCC, amber = 0xCB, red = 0xC3;
   std::fill(pixels.begin(), pixels.end(), 0xC0);
-  const int x = width / 8, top = height / 8, step = height / 11;
+  const auto y = [this](int position) { return height * position / 240; };
+  const bool recording = state.phase == RideMessage::Phase::Recording;
+  const bool saved = state.phase == RideMessage::Phase::Saved;
+  const bool failed = state.phase == RideMessage::Phase::Error;
   char line[48];
-  text(x, top, "MTB LOGGER");
-  const char *phase = state.phase == RideMessage::Phase::Recording ? "RECORDING" :
-                      state.phase == RideMessage::Phase::Saved ? "FIT SAVED" :
-                      state.phase == RideMessage::Phase::Error ? "SAVE/LOG ERROR" : "READY";
-  text(x, top + step, phase);
-  std::snprintf(line,sizeof(line),"TIME %02lu:%02lu:%02lu",
-    static_cast<unsigned long>(state.elapsedSeconds / 3600),
-    static_cast<unsigned long>(state.elapsedSeconds / 60 % 60),
-    static_cast<unsigned long>(state.elapsedSeconds % 60));
-  text(x, top + step * 2, line);
-  text(x, top + step * 3, state.gpsFix ? "GPS FIX" : "GPS NO FIX");
-  std::snprintf(line,sizeof(line),"ACC %lu %s",static_cast<unsigned long>(state.accelerationCount),state.accelerationLive ? "LIVE" : "WAIT");
-  text(x, top + step * 4, line);
-  std::snprintf(line,sizeof(line),"GYRO %lu %s",static_cast<unsigned long>(state.gyroCount),state.gyroLive ? "LIVE" : "WAIT");
-  text(x, top + step * 5, line);
-  if (state.maxSpeedAvailable)
-    std::snprintf(line, sizeof(line), "MAX %.1f KM/H", static_cast<double>(state.maxSpeedKmh));
-  else std::snprintf(line, sizeof(line), "MAX -- KM/H");
-  text(x, top + step * 6, line);
-  text(x, top + step * 7, "JUMPS NOT ENABLED");
-  text(x, top + step * 8, controls.confirmingSave() ? "R1 CONFIRM SAVE" :
-       state.phase == RideMessage::Phase::Recording ? "R1 STOP AND SAVE" : "R1 START RIDE");
-  text(x, top + step * 9, controls.confirmingSave() ? "R2 CANCEL" : "R2 BACK");
+  // Status dot: green recording, amber ready, white saved, red error.
+  const auto statusColor = failed ? red : recording ? green : saved ? white : amber;
+  const int radius = 4, dotY = y(25), dotX = width / 2;
+  for (int dy = -radius; dy <= radius; ++dy)
+    for (int dx = -radius; dx <= radius; ++dx)
+      if (dx*dx + dy*dy <= radius*radius && dotX+dx >= 0 && dotX+dx < width &&
+          dotY+dy >= 0 && dotY+dy < height)
+        pixels[(dotY+dy)*width+dotX+dx] = statusColor;
+  if (saved || failed) centered(y(39), saved ? "FIT SAVED" : "LOG ERROR", failed ? red : white, 1);
+
+  if (controls.page() == RideControls::Page::Ride) {
+    if (state.elapsedSeconds < 3600) {
+      std::snprintf(line, sizeof(line), "%02lu:%02lu",
+        static_cast<unsigned long>(state.elapsedSeconds / 60),
+        static_cast<unsigned long>(state.elapsedSeconds % 60));
+    } else {
+      std::snprintf(line, sizeof(line), "%02lu:%02lu:%02lu",
+        static_cast<unsigned long>(state.elapsedSeconds / 3600),
+        static_cast<unsigned long>(state.elapsedSeconds / 60 % 60),
+        static_cast<unsigned long>(state.elapsedSeconds % 60));
+    }
+    centered(y(60), line, white, 5);
+
+    if (state.gpsFix) {
+      std::snprintf(line, sizeof(line), "LAT %.5f", static_cast<double>(state.latitude));
+      centered(y(103), line, green, 2);
+      std::snprintf(line, sizeof(line), "LON %.5f", static_cast<double>(state.longitude));
+      centered(y(122), line, green, 2);
+    } else {
+      centered(y(111), saved ? "GPS OFF" : "GPS WAIT", saved ? muted : amber, 2);
+    }
+    const auto sensorColor = [&](bool live, uint32_t received) {
+      return saved ? muted : live ? green : recording && received > 0 ? red : amber;
+    };
+    if (state.accelerationLive)
+      std::snprintf(line, sizeof(line), "A:%.1f", static_cast<double>(state.accelerationMagnitude));
+    else std::snprintf(line, sizeof(line), "A:--");
+    centeredAt(width / 3, y(160), width / 3, line,
+               sensorColor(state.accelerationLive, state.accelerationCount), 2);
+    if (state.gyroLive)
+      std::snprintf(line, sizeof(line), "G:%.1f", static_cast<double>(state.gyroMagnitude));
+    else std::snprintf(line, sizeof(line), "G:--");
+    centeredAt(width * 2 / 3, y(160), width / 3, line,
+               sensorColor(state.gyroLive, state.gyroCount), 2);
+  } else {
+    centered(y(65), "MAX SPEED", muted, 2);
+    if (state.maxSpeedAvailable)
+      std::snprintf(line, sizeof(line), "%.1f", static_cast<double>(state.maxSpeedKmh));
+    else std::snprintf(line, sizeof(line), "--");
+    centered(y(100), line, white, 5);
+    centered(y(148), "KM/H", muted, 2);
+  }
+
+
+  centered(y(201), controls.confirmingSave() ? "R1 SAVE" : recording ? "R1 STOP" : "R1 START",
+           controls.confirmingSave() ? amber : green);
+  centered(y(218), controls.confirmingSave() ? "R2 CANCEL" : "R2 BACK", muted, 1);
   if (auto update = SDK::make_msg<SDK::Message::RequestDisplayUpdate>(kernel)) {
     update->pBuffer = pixels.data();
     update.send(100);
@@ -76,8 +125,8 @@ void Gui::draw() {
 
 void Gui::run() {
   if (auto config = SDK::make_msg<SDK::Message::RequestDisplayConfig>(kernel)) {
-    if (!config.send(100) || !config.ok() || config->width <= 0 ||
-        config->height <= 0 || config->width > 640 || config->height > 640 || config->colorDepth != 8) return;
+    if (!config.send(100) || !config.ok() ||
+        !supportsDisplay(config->width, config->height, config->colorDepth)) return;
     width = config->width; height = config->height;
     pixels.resize(static_cast<size_t>(width) * height);
   } else return;
@@ -87,24 +136,36 @@ void Gui::run() {
     if (!kernel.comm.getMessage(message, 1000)) continue;
     switch (message->getType()) {
     case SDK::MessageType::COMMAND_APP_STOP:
+      message->setResult(SDK::MessageResult::SUCCESS);
       kernel.comm.releaseMessage(message);
       return;
     case SDK::MessageType::COMMAND_APP_GUI_RESUME:
+      message->setResult(SDK::MessageResult::SUCCESS);
       visible = true;
       controls.cancel();
       SDK::send_msg<RideMessage::Request>(kernel);
       break;
     case SDK::MessageType::COMMAND_APP_GUI_SUSPEND:
+      message->setResult(SDK::MessageResult::SUCCESS);
       visible = false;
       controls.cancel();
+      SDK::send_msg<RideMessage::CancelPreparation>(kernel);
+      break;
+    case SDK::MessageType::EVENT_GUI_TICK:
+      message->setResult(SDK::MessageResult::SUCCESS);
       break;
     case RideMessage::status:
+      message->setResult(SDK::MessageResult::SUCCESS);
       state = static_cast<RideMessage::Status *>(message)->state;
       break;
     case SDK::MessageType::EVENT_BUTTON: {
+      message->setResult(SDK::MessageResult::SUCCESS);
       auto &button = *static_cast<SDK::Message::EventButton *>(message);
       if (!visible || button.event != SDK::Message::EventButton::Event::CLICK) break;
-      if (button.id == SDK::Message::EventButton::Id::SW2) {
+      if (button.id == SDK::Message::EventButton::Id::SW1 ||
+          button.id == SDK::Message::EventButton::Id::SW3) {
+        controls.changePage();
+      } else if (button.id == SDK::Message::EventButton::Id::SW2) {
         switch (controls.select(state.phase)) {
         case RideControls::Action::Start: SDK::send_msg<RideMessage::Start>(kernel); break;
         case RideControls::Action::Save: SDK::send_msg<RideMessage::Stop>(kernel); break;

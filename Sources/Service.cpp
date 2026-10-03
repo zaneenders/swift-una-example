@@ -19,14 +19,19 @@ void Service::run() {
         return;
       case SDK::MessageType::COMMAND_APP_NOTIF_GUI_RUN:
         guiLoaded = true;
+        if (logger.status().phase == RideMessage::Phase::Ready) logger.prepareGps();
         publish();
         break;
       case SDK::MessageType::COMMAND_APP_NOTIF_GUI_STOP:
         guiLoaded = false;
+        if (logger.status().phase != RideMessage::Phase::Recording) logger.stop();
+        break;
+      case RideMessage::cancelPreparation:
+        if (logger.status().phase != RideMessage::Phase::Recording) logger.stop();
         break;
       case RideMessage::start:
         if (logger.status().phase != RideMessage::Phase::Recording) {
-          logger.stop();
+          if (logger.failed()) logger.stop();
           logger.start();
         }
         publish();
@@ -36,6 +41,7 @@ void Service::run() {
         publish();
         break;
       case RideMessage::request:
+        if (logger.status().phase == RideMessage::Phase::Ready) logger.prepareGps();
         publish();
         break;
       case SDK::MessageType::EVENT_SENSOR_LAYER_DATA:

@@ -10,13 +10,18 @@
 #include "SDK/SensorLayer/DataParsers/SensorDataParserGpsDistance.hpp"
 #include <cstdio>
 #include <ctime>
+#include <cmath>
+
+void RideLogger::prepareGps() {
+  gpsWanted = true;
+  if (!location.isConnected()) location.connect();
+  if (!speed.isConnected()) speed.connect();
+}
 
 bool RideLogger::start() {
   if (file)
     return !error;
   error = false;
-  fix = false;
-  speedValid = false;
   maximumSpeed.reset();
   ticks = 0;
   saved = false;
@@ -53,11 +58,15 @@ bool RideLogger::start() {
     stop();
     return false;
   }
+  prepareGps();
   tick();
   return true;
 }
 
 void RideLogger::stop() {
+  gpsWanted = false;
+  fix = false;
+  speedValid = false;
   acceleration.disconnect();
   rotation.disconnect();
   location.disconnect();
@@ -78,6 +87,7 @@ void RideLogger::stop() {
 }
 
 void RideLogger::tick() {
+  if (gpsWanted && !error) prepareGps();
   if (!file || error) return;
   // Retry unsuccessful subscriptions, including the SDK's startup connect race.
   if (!acceleration.isConnected()) acceleration.connect();
@@ -107,18 +117,28 @@ void RideLogger::append(uint64_t timestamp, uint32_t kind, bool valid,
 }
 
 void RideLogger::receive(const SDK::Message::Sensor::EventData &event) {
-  if (!file || error) return;
+  if (error || (!file && !gpsWanted)) return;
   SDK::Sensor::DataBatch batch(event.data, event.count, event.stride);
   for (uint16_t index = 0; index < batch.size(); ++index) {
     auto sample = batch[index];
     const auto timestamp = sample.getTimestampUs();
     if (acceleration.matchesDriver(event.handle)) {
       SDK::SensorDataParser::Accelerometer parser(sample);
-      if (parser.isDataValid()) { ++accelerationCount; lastAccelerationMs = kernel.sys.getTimeMs(); }
+      if (parser.isDataValid() && std::isfinite(parser.getX()) &&
+          std::isfinite(parser.getY()) && std::isfinite(parser.getZ())) {
+        ++accelerationCount;
+        lastAccelerationMs = kernel.sys.getTimeMs();
+        accelerationMagnitude = std::hypot(parser.getX(), parser.getY(), parser.getZ());
+      }
       append(timestamp, 1, parser.isDataValid(), parser.getX(), parser.getY(), parser.getZ());
     } else if (rotation.matchesDriver(event.handle)) {
       SDK::SensorDataParser::Gyroscope parser(sample);
-      if (parser.isDataValid()) { ++gyroCount; lastGyroMs = kernel.sys.getTimeMs(); }
+      if (parser.isDataValid() && std::isfinite(parser.getX()) &&
+          std::isfinite(parser.getY()) && std::isfinite(parser.getZ())) {
+        ++gyroCount;
+        lastGyroMs = kernel.sys.getTimeMs();
+        gyroMagnitude = std::hypot(parser.getX(), parser.getY(), parser.getZ());
+      }
       append(timestamp, 2, parser.isDataValid(), parser.getX(), parser.getY(), parser.getZ());
     } else if (location.matchesDriver(event.handle)) {
       SDK::SensorDataParser::GpsLocation parser(sample);
@@ -133,7 +153,7 @@ void RideLogger::receive(const SDK::Message::Sensor::EventData &event) {
       SDK::SensorDataParser::GpsSpeed parser(sample);
       speedValid = parser.isSpeedValid();
       speedMps = parser.getSpeed();
-      maximumSpeed.add(speedMps, speedValid);
+      if (file) maximumSpeed.add(speedMps, speedValid);
       lastSpeedMs = kernel.sys.getTimeMs();
       append(timestamp, 4, parser.isSpeedValid(), parser.getSpeed(), 0);
     } else if (pressure.matchesDriver(event.handle)) {
@@ -158,10 +178,13 @@ RideMessage::State RideLogger::status() {
   result.maxSpeedAvailable = maximumSpeed.hasReading();
   result.maxSpeedKmh = maximumSpeed.kilometresPerHour();
   result.elapsedSeconds = (file ? now - startMs : elapsedMs) / 1000;
+  result.accelerationMagnitude = accelerationMagnitude;
+  result.gyroMagnitude = gyroMagnitude;
   result.accelerationCount = accelerationCount;
   result.gyroCount = gyroCount;
   result.accelerationLive = file && accelerationCount && now - lastAccelerationMs < 2000;
   result.gyroLive = file && gyroCount && now - lastGyroMs < 2000;
-  result.gpsFix = file && fix && now - lastLocationMs < 3000;
+  result.gpsFix = gpsWanted && fix && now - lastLocationMs < 3000;
+  if (result.gpsFix) { result.latitude = latitude; result.longitude = longitude; }
   return result;
 }
