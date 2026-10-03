@@ -2,3 +2,5 @@ build/
 .venv/
 Scripts/.build/
 Scripts/.swiftpm/
+/.build/
+/.swiftpm/
