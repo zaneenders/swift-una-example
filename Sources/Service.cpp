@@ -14,7 +14,7 @@ extern "C" void printGlanceText(void *context, const uint8_t *text,
   control.print("%.*s", static_cast<int>(length),
                 reinterpret_cast<const char *>(text));
 }
-} // namespace
+}
 
 void Service::run() {
   while (true) {

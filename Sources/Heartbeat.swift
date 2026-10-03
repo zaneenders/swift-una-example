@@ -17,7 +17,6 @@ struct GlanceState {
     }
 }
 
-// C++ provides storage; Swift owns its initialization and all state transitions.
 @c(swift_glance_initialize)
 public func initializeGlance(_ tick: UnsafeMutablePointer<UInt32>) {
     var storage = MutableSpan(_unsafeStart: tick, count: 1)

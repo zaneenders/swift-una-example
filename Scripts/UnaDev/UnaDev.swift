@@ -107,6 +107,9 @@ struct Tools {
     }
 
     func build() async throws {
+        if !FileManager.default.fileExists(atPath: root.appendingPathComponent("una-sdk/cmake/una-app.cmake").path) {
+            try await run("git", ["submodule", "update", "--init", "una-sdk"])
+        }
         let compiler = try await checkBuildTools()
         try await run("cmake", ["-S", ".", "-B", "build", "-DSWIFTC=\(compiler)"])
         try await run("cmake", ["--build", "build", "--parallel", String(ProcessInfo.processInfo.activeProcessorCount)])
