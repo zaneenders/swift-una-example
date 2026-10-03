@@ -1,16 +1,13 @@
 #pragma once
-
-#include "SDK/Glance/GlanceControl.hpp"
 #include "SDK/Kernel/Kernel.hpp"
-
+#include "RideLogger.hpp"
 class Service {
 public:
-    explicit Service(SDK::Kernel &kernel) : kernel(kernel) {}
-    void run();
-
+  explicit Service(SDK::Kernel &kernel) : kernel(kernel), logger(kernel) {}
+  void run();
 private:
-    SDK::Kernel &kernel;
-    SDK::Glance::Form form;
-    SDK::Glance::ControlText value;
-    uint32_t tick = 0;
+  void publish();
+  SDK::Kernel &kernel;
+  RideLogger logger;
+  bool guiLoaded = false;
 };
