@@ -17,7 +17,11 @@ bool RideLogger::start() {
   error = false;
   fix = false;
   speedValid = false;
+  maximumSpeed.reset();
   ticks = 0;
+  saved = false;
+  elapsedMs = 0;
+  accelerationCount = gyroCount = 0;
   if (!kernel.fs.mkdir("Rides")) {
     error = true;
     return false;
@@ -62,12 +66,14 @@ void RideLogger::stop() {
   magnetic.disconnect();
   distance.disconnect();
   if (file) {
+    elapsedMs = kernel.sys.getTimeMs() - startMs;
     if (!error && fit && !fit->finish(static_cast<uint32_t>(std::time(nullptr)),
                                       kernel.sys.getTimeMs() - startMs)) error = true;
     fit.reset();
     if (!file->flush()) error = true;
     if (!file->close()) error = true;
     file.reset();
+    saved = !error;
   }
 }
 
@@ -108,9 +114,11 @@ void RideLogger::receive(const SDK::Message::Sensor::EventData &event) {
     const auto timestamp = sample.getTimestampUs();
     if (acceleration.matchesDriver(event.handle)) {
       SDK::SensorDataParser::Accelerometer parser(sample);
+      if (parser.isDataValid()) { ++accelerationCount; lastAccelerationMs = kernel.sys.getTimeMs(); }
       append(timestamp, 1, parser.isDataValid(), parser.getX(), parser.getY(), parser.getZ());
     } else if (rotation.matchesDriver(event.handle)) {
       SDK::SensorDataParser::Gyroscope parser(sample);
+      if (parser.isDataValid()) { ++gyroCount; lastGyroMs = kernel.sys.getTimeMs(); }
       append(timestamp, 2, parser.isDataValid(), parser.getX(), parser.getY(), parser.getZ());
     } else if (location.matchesDriver(event.handle)) {
       SDK::SensorDataParser::GpsLocation parser(sample);
@@ -125,6 +133,7 @@ void RideLogger::receive(const SDK::Message::Sensor::EventData &event) {
       SDK::SensorDataParser::GpsSpeed parser(sample);
       speedValid = parser.isSpeedValid();
       speedMps = parser.getSpeed();
+      maximumSpeed.add(speedMps, speedValid);
       lastSpeedMs = kernel.sys.getTimeMs();
       append(timestamp, 4, parser.isSpeedValid(), parser.getSpeed(), 0);
     } else if (pressure.matchesDriver(event.handle)) {
@@ -139,4 +148,20 @@ void RideLogger::receive(const SDK::Message::Sensor::EventData &event) {
       append(timestamp, 7, parser.isDataValid(), parser.getDistance(), 0);
     }
   }
+}
+
+RideMessage::State RideLogger::status() {
+  const auto now = kernel.sys.getTimeMs();
+  RideMessage::State result;
+  result.phase = error ? RideMessage::Phase::Error : file ? RideMessage::Phase::Recording :
+                 saved ? RideMessage::Phase::Saved : RideMessage::Phase::Ready;
+  result.maxSpeedAvailable = maximumSpeed.hasReading();
+  result.maxSpeedKmh = maximumSpeed.kilometresPerHour();
+  result.elapsedSeconds = (file ? now - startMs : elapsedMs) / 1000;
+  result.accelerationCount = accelerationCount;
+  result.gyroCount = gyroCount;
+  result.accelerationLive = file && accelerationCount && now - lastAccelerationMs < 2000;
+  result.gyroLive = file && gyroCount && now - lastGyroMs < 2000;
+  result.gpsFix = file && fix && now - lastLocationMs < 3000;
+  return result;
 }

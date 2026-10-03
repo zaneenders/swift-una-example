@@ -4,6 +4,8 @@
 #include "SDK/SensorLayer/SensorConnection.hpp"
 #include "SDK/Messages/SensorLayerMessages.hpp"
 #include "RideFitWriter.hpp"
+#include "RideMessages.hpp"
+#include "MaximumSpeed.hpp"
 #include <memory>
 
 class RideLogger {
@@ -14,6 +16,7 @@ public:
   void stop();
   void receive(const SDK::Message::Sensor::EventData &event);
   void tick();
+  RideMessage::State status();
   bool failed() const { return error; }
   bool connected() {
     return acceleration.isConnected() && rotation.isConnected() &&
@@ -40,4 +43,9 @@ private:
   float latitude = 0, longitude = 0, altitude = 0, speedMps = 0;
   bool error = false;
   unsigned ticks = 0;
+  uint32_t accelerationCount = 0, gyroCount = 0;
+  uint32_t lastAccelerationMs = 0, lastGyroMs = 0;
+  uint32_t elapsedMs = 0;
+  bool saved = false;
+  MaximumSpeed maximumSpeed;
 };

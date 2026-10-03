@@ -40,10 +40,22 @@ C++ writer with SwiftFit. No watch writes. The round-trip test requires `clang++
 
 ## MTB logger prototype
 
-Opening the glance starts a new recording; leaving it or stopping the app
-finalizes the FIT file and disconnects sensors. This is **not yet a background
-ride app or a jump detector**. Glance lifetime determines recording lifetime.
-Hardware support, actual sampling rates and power consumption remain unverified.
+The app now has a full-screen, physical-button GUI and a separate recording
+service. Opening it does not start recording. **R1 (top right)** starts a ride;
+while recording, press R1 twice to stop and confirm saving. **R2 (bottom right)**
+cancels a pending save, or closes the GUI. Recording continues with the GUI
+closed/suspended; reopen the app to see current state and stop/save. The service
+paces recording on its own one-second clock, independent of screen ticks.
+
+Dashboard: recording state, elapsed timer, GPS-fix freshness, maximum GPS speed
+in km/h (resets on start, retained after save; `--` until a valid reading), accelerometer and
+gyro valid-sample counts, and LIVE/WAIT indicators (stale after two seconds).
+`FIT SAVED` is shown only after finalization and file flush/close succeed; errors
+show `SAVE/LOG ERROR`. `JUMPS NOT ENABLED` is intentional: no validated jump
+classifier or airtime score exists yet. First validate sensor logs, then tune
+against labeled rides. Hardware behavior, button routing, display layout,
+background residency and power use remain unverified. The GUI requires an
+8-bit ABGR2222 display. There is no touchscreen interface in this prototype.
 
 Requested streams (all samples in each batch are retained):
 
@@ -56,7 +68,7 @@ Requested streams (all samples in each batch are retained):
 | Pressure | 10 Hz | Pressure Pa, sea-level reference Pa, derived altitude m |
 | Magnetic field | 20 Hz | XYZ µT, calibration flag |
 | GPS distance | 1 Hz | Cumulative metres |
-| Clock anchor | Each glance tick | UTC seconds split into high/low 16-bit halves |
+| Clock anchor | Each service tick | UTC seconds split into high/low 16-bit halves |
 
 Acceleration and gyro are the primary jump signals. Pressure can provide
 vertical context but is affected by airflow; magnetic readings may be distorted
@@ -66,19 +78,15 @@ applied. The watch cannot directly measure wheel contact; wrist motion can still
 cause false positives. Compare recordings against externally noted/video jump
 labels when tuning.
 
-`MTB logging` means all seven subscriptions connected, **not** that GPS has a fix
-or samples are arriving. `Connecting` means at least one stream is unavailable;
-other streams still record. `Log error` indicates storage failure. Reopen to
-retry. Do not interact with the watch while riding.
 
 App-relative files: `Rides/ride_<UTC-seconds>_<sequence>.fit`, created without
 overwriting existing files. Uses the SDK streaming FIT writer with bounded
-per-message memory. Syncs every five glance ticks and finalizes on stop. Abrupt
+per-message memory. Syncs every five service ticks and finalizes on stop. Abrupt
 power loss can leave an unfinalized file; automatic recovery is not implemented.
 Expect roughly 20 MB/hour at requested rates. Logs contain private location data;
 copy them off regularly and check available storage before riding.
 
-FIT includes standard once-per-glance-tick GPS/speed records, timer events,
+FIT includes standard once-per-second GPS/speed records, timer events,
 MTB session and activity summaries. High-rate samples use private message 0xFF00
 with developer fields: sensor clock µs, stream ID, validity, six float channels.
 IDs 1–8 follow the table order. Unused channels are zero; invalid readings are
@@ -135,3 +143,10 @@ SWIFTC="$HOME/Library/Developer/Toolchains/swift-6.4.0-RELEASE.xctoolchain/usr/b
 
 Installing replaces our previous bird demo, not Cycling. Start with a short
 stationary/walking log to verify sample rates and units before collecting rides.
+
+Button-control test:
+
+```sh
+clang++ -std=c++17 -I Sources -I una-sdk/Libs/Header Tests/RideControlsTests.cpp -o /tmp/una-controls-tests
+/tmp/una-controls-tests
+```
