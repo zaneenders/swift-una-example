@@ -20,3 +20,20 @@ import Testing
   try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: program.path)
   #expect(throws: ToolError.self) { try tools.executable("tool") }
 }
+
+@Test func swiftCompilerUsesPathAndOverride() throws {
+  let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+  defer { try? FileManager.default.removeItem(at: root) }
+  try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+  let compiler = root.appendingPathComponent("swiftc")
+  let override = root.appendingPathComponent("custom-swiftc")
+  for file in [compiler, override] {
+    try Data("#!/bin/sh\nexit 0\n".utf8).write(to: file)
+    try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: file.path)
+  }
+  #expect(try Tools(environment: ["PATH": root.path]).swiftCompiler() == compiler.path)
+  #expect(try Tools(environment: ["PATH": root.path, "SWIFTC": override.path]).swiftCompiler() == override.path)
+  #expect(throws: ToolError.self) {
+    try Tools(environment: ["PATH": root.path, "SWIFTC": root.appendingPathComponent("missing").path]).swiftCompiler()
+  }
+}

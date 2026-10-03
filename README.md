@@ -4,13 +4,15 @@ Embedded Swift UNA Glance. Hardware untested.
 
 ## Requirements
 
-- macOS 13+, host Swift 6.2+
-- [swift.org Swift 6.4](https://www.swift.org/install/) with Embedded ARM support (not Xcode's Swift)
+- macOS 13+ or Linux (Linux build unverified; watch installation is macOS-only)
+- [Swiftly](https://www.swift.org/install/) Swift 6.4 with Embedded ARM support
 - STM32CubeCLT 1.22.0, CMake, [uv](https://docs.astral.sh/uv/), `rsvg-convert` (`brew install librsvg`)
 
 ## Build / install
 
 ```sh
+swiftly install 6.4.0
+swiftly use 6.4.0
 swift run UnaDev doctor
 swift run UnaDev build
 swift run UnaDev install

@@ -1,4 +1,8 @@
+#if canImport(Darwin)
 import Darwin
+#else
+import Glibc
+#endif
 import Foundation
 import Subprocess
 
@@ -59,10 +63,7 @@ struct Tools {
   }
 
   func swiftCompiler() throws -> String {
-    if let override = environment["SWIFTC"] { return try executable(override) }
-    let path = FileManager.default.homeDirectoryForCurrentUser
-      .appendingPathComponent("Library/Developer/Toolchains/swift-6.4.0-RELEASE.xctoolchain/usr/bin/swiftc").path
-    return try executable(FileManager.default.isExecutableFile(atPath: path) ? path : "swiftc")
+    try executable(environment["SWIFTC"] ?? "swiftc")
   }
 
   func run(_ name: String, _ arguments: [String]) async throws {

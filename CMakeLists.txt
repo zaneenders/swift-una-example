@@ -20,8 +20,8 @@ include($ENV{UNA_SDK}/cmake/una-app.cmake)
 include($ENV{UNA_SDK}/cmake/una-sdk.cmake)
 project(${APP_NAME})
 
-if(NOT DEFINED SWIFTC AND EXISTS "$ENV{HOME}/Library/Developer/Toolchains/swift-6.4.0-RELEASE.xctoolchain/usr/bin/swiftc")
-    set(SWIFTC "$ENV{HOME}/Library/Developer/Toolchains/swift-6.4.0-RELEASE.xctoolchain/usr/bin/swiftc")
+if(NOT DEFINED SWIFTC AND DEFINED ENV{SWIFTC})
+    set(SWIFTC "$ENV{SWIFTC}")
 endif()
 find_program(SWIFTC swiftc REQUIRED)
 execute_process(COMMAND ${SWIFTC} -version
