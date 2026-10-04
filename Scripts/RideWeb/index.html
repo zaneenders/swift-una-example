@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mountain bike ride · lift & airtime candidates</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+body{margin:0;background:#101820;color:#edf3f8;font:15px system-ui}header{padding:16px 22px}h1{font-size:22px;margin:0 0 8px}.legend{display:flex;gap:20px;flex-wrap:wrap}.route{color:#79aef8}.lift{color:#b58bff}.jump{color:#ff993e}#map{height:70vh;min-height:400px}#notes{padding:8px 22px;color:#c1ccd7;font-size:13px}details{padding:12px 22px}button{background:#253748;color:white;border:1px solid #607689;border-radius:4px;padding:5px 9px;cursor:pointer}table{border-collapse:collapse;width:100%;max-width:900px}td,th{text-align:left;padding:7px;border-bottom:1px solid #344553}.leaflet-popup-content{line-height:1.5}
+</style>
+</head>
+<body>
+<header><h1>Mountain bike ride</h1><div id="summary">Loading analyzed FIT data…</div><p class="legend"><span class="route">● GPS route</span><span class="lift">● Lift candidates</span><span class="jump">● 0.35 g airtime candidates</span></p></header>
+<div id="map" aria-label="Ride route with lift and jump candidate markers"></div><div id="notes"></div>
+<details open><summary>Jump candidates · Utah Mountain Time · approximate GPS positions</summary><table><thead><tr><th>Event</th><th>Time</th><th>Low-force duration</th><th>Map</th></tr></thead><tbody id="events"></tbody></table></details>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(async()=>{
+try{
+const response=await fetch('/api/ride');if(!response.ok)throw Error(`Server returned ${response.status}`);const ride=await response.json();
+const map=L.map('map');L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(map);
+const route=L.layerGroup().addTo(map),lifts=L.layerGroup().addTo(map),jumps=L.layerGroup().addTo(map);
+const coord=p=>[p.latitude,p.longitude];const time=t=>new Date(t*1000).toLocaleString('en-US',{timeZone:'America/Denver',hour:'numeric',minute:'2-digit',second:'2-digit',timeZoneName:'short'});
+const duration=x=>x.end-x.start;const total=xs=>xs.reduce((s,x)=>s+duration(x),0);const points=[];
+for(const path of ride.route){const coords=path.map(coord);points.push(...coords);if(coords.length>1)L.polyline(coords,{color:'#3985dd',weight:3,opacity:.55}).addTo(route);}
+ride.lifts.forEach((lift,i)=>{for(const path of lift.paths){if(path.length<2)continue;L.polyline(path.map(coord),{color:'#9563ed',weight:7,opacity:.8}).bindPopup(`<b>Lift candidate ${i+1}</b><br>${time(lift.start)} – ${time(lift.end)}<br>${(duration(lift)/60).toFixed(2)} min`).addTo(lifts);}});
+ride.jumps.forEach((jump,i)=>{
+const description=`<b>Jump candidate ${i+1}</b><br>${time(jump.start)}<br>${duration(jump).toFixed(2)} s below 0.35 g<br>Approximate interpolated GPS position; not confirmed airtime.`;
+let marker;if(jump.position){if(jump.path.length===2)L.polyline(jump.path.map(coord),{color:'#ff8b22',weight:9}).bindPopup(description).addTo(jumps);marker=L.circleMarker(coord(jump.position),{radius:7,color:'#643100',weight:2,fillColor:'#ff993e',fillOpacity:.9}).bindPopup(description).addTo(jumps);}
+const tr=document.createElement('tr');for(const text of [`${i+1}`,time(jump.start),`${duration(jump).toFixed(2)} s`]){const td=document.createElement('td');td.textContent=text;tr.append(td);}const td=document.createElement('td');if(marker){const button=document.createElement('button');button.textContent='Show';button.onclick=()=>{jumps.addTo(map);map.setView(coord(jump.position),18);marker.openPopup();};td.append(button);}else td.textContent='GPS unavailable';tr.append(td);document.querySelector('#events').append(tr);
+});
+L.control.layers(null,{'GPS route':route,'Lift candidates':lifts,'0.35 g jump candidates':jumps}).addTo(map);if(points.length)map.fitBounds(L.latLngBounds(points),{padding:[20,20]});
+document.querySelector('#summary').textContent=`${ride.lifts.length} lift-like sections · ${(total(ride.lifts)/60).toFixed(1)} min · ${ride.jumps.length} jump candidates · ${total(ride.jumps).toFixed(2)} s estimated low-force airtime`;
+for(const warning of ride.warnings){const p=document.createElement('p');p.textContent=warning;document.querySelector('#notes').append(p);}const p=document.createElement('p');p.textContent='Low-force intervals of 0.12–2 s must be in classified descending sections and followed by a >1.5 g landing-like peak. Median acceleration normalizes 1 g. Map lines exaggerate visibility, not spatial accuracy. Basemap tiles and Leaflet load from external services.';document.querySelector('#notes').append(p);
+}catch(error){document.querySelector('#summary').textContent=`Unable to load map: ${error.message}`;}
+})();
+</script>
+</body></html>
