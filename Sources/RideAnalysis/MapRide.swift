@@ -52,7 +52,10 @@ public struct MapRide: Codable, Sendable {
     var previous: Point?
     for point in locations {
       if !valid(point) || (previous.map { point.time - $0.time > 3 } ?? false) {
-        if !path.isEmpty { paths.append(path); path = [] }
+        if !path.isEmpty {
+          paths.append(path)
+          path = []
+        }
       }
       if valid(point) { path.append(mapPoint(point)) }
       previous = point
@@ -61,7 +64,8 @@ public struct MapRide: Codable, Sendable {
     guard !paths.isEmpty else { throw AnalysisError(description: "No valid GPS route") }
     route = paths
     lifts = liftIntervals.map { interval in
-      MapSection(start: interval.start + offset, end: interval.end + offset,
+      MapSection(
+        start: interval.start + offset, end: interval.end + offset,
         paths: paths.map { $0.filter { $0.time >= interval.start + offset && $0.time <= interval.end + offset } }
           .filter { !$0.isEmpty })
     }
@@ -69,20 +73,25 @@ public struct MapRide: Codable, Sendable {
       let start = interpolateLocation(locations, at: interval.start).map(mapPoint)
       let end = interpolateLocation(locations, at: interval.end).map(mapPoint)
       let center = interpolateLocation(locations, at: (interval.start + interval.end) / 2).map(mapPoint)
-      return MapJump(start: interval.start + offset, end: interval.end + offset,
+      return MapJump(
+        start: interval.start + offset, end: interval.end + offset,
         position: center, path: [start, end].compactMap { $0 })
     }
     var notes = log.warnings
     notes.append("Lift and jump candidates are heuristic, not confirmed lift rides or wheel-off-ground time.")
-    notes.append("Jump locations interpolate ~1 Hz GPS; wrist acceleration and sensor/uptime clock alignment are unverified.")
+    notes.append(
+      "Jump locations interpolate ~1 Hz GPS; wrist acceleration and sensor/uptime clock alignment are unverified.")
     let missingPositions = jumps.filter { $0.position == nil }.count
-    if missingPositions > 0 { notes.append("\(missingPositions) jump candidates cannot be mapped without bridging missing GPS.") }
+    if missingPositions > 0 {
+      notes.append("\(missingPositions) jump candidates cannot be mapped without bridging missing GPS.")
+    }
     warnings = notes
   }
 }
 
 public func interpolateLocation(_ points: [Point], at time: Double) -> Point? {
-  var low = 0, high = points.count
+  var low = 0
+  var high = points.count
   while low < high {
     let middle = (low + high) / 2
     if points[middle].time < time { low = middle + 1 } else { high = middle }
@@ -93,7 +102,8 @@ public func interpolateLocation(_ points: [Point], at time: Double) -> Point? {
   }
   if low < points.count, points[low].time == time { return valid(points[low]) ? points[low] : nil }
   guard low > 0, low < points.count else { return nil }
-  let a = points[low - 1], b = points[low]
+  let a = points[low - 1]
+  let b = points[low]
   guard valid(a), valid(b), b.time - a.time <= 3, b.time > a.time else { return nil }
   let fraction = (time - a.time) / (b.time - a.time)
   return Point(time: time, values: zip(a.values, b.values).map { $0 + ($1 - $0) * fraction })

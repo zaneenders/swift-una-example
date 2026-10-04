@@ -20,7 +20,8 @@ struct RideWeb {
     let html = try String(contentsOf: url, encoding: .utf8)
     let router = Router()
     router.get("/") { _, _ in
-      Response(status: .ok, headers: [.contentType: "text/html; charset=utf-8"], body: .init(byteBuffer: .init(string: html)))
+      Response(
+        status: .ok, headers: [.contentType: "text/html; charset=utf-8"], body: .init(byteBuffer: .init(string: html)))
     }
     router.get("/api/ride") { _, _ in
       Response(status: .ok, headers: [.contentType: "application/json"], body: .init(byteBuffer: .init(string: json)))

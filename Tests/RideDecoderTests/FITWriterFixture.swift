@@ -19,8 +19,8 @@ struct FITWriterFixture {
     let fixture = temporary.appendingPathComponent("all-streams.fit")
     try run(
       [
-        "clang++", "-std=c++17", "-I", "Sources", "-I", "una-sdk/Libs/Header",
-        "Tests/RideFitWriterTests.cpp", "Sources/RideFitWriter.cpp",
+        "clang++", "-std=c++17", "-I", "Sources/UnaApp", "-I", "una-sdk/Libs/Header",
+        "Tests/UnaAppTests/RideFitWriterTests.cpp", "Sources/UnaApp/RideFitWriter.cpp",
         "una-sdk/Libs/Source/Fit/FitWriter.cpp", "una-sdk/Libs/Source/Fit/FitCrc.cpp",
         "-o", executable.path,
       ], in: root)

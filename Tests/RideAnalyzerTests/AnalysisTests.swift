@@ -1,5 +1,5 @@
-import Testing
 import RideAnalysis
+import Testing
 
 private func acceleration(_ index: Int, _ value: Double) -> Point {
   Point(time: Double(index) * 0.02, values: [0, 0, value])
@@ -63,8 +63,11 @@ private func acceleration(_ index: Int, _ value: Double) -> Point {
   let acceleration = (0..<6000).map {
     Point(time: Double($0) * 0.02, values: [0, 0, (1000..<1020).contains($0) ? 0.1 : ($0 == 1020 ? 2 : 1)])
   }
-  let log = SensorLog(streams: [1: acceleration, 3: locations,
-    8: [Point(time: 0, values: [0, 1000])]], warnings: ["test warning"])
+  let log = SensorLog(
+    streams: [
+      1: acceleration, 3: locations,
+      8: [Point(time: 0, values: [0, 1000])],
+    ], warnings: ["test warning"])
   let ride = try MapRide(log: log)
   #expect(ride.jumps.count == 1)
   #expect(ride.jumps[0].position != nil)

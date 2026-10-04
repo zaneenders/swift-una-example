@@ -13,25 +13,24 @@ let package = Package(
     .package(url: "https://github.com/swiftlang/swift-subprocess.git", .upToNextMinor(from: "1.0.0")),
   ],
   targets: [
-    .target(name: "RideAnalysis", dependencies: [.product(name: "SwiftFit", package: "swift-fit")], path: "Scripts/RideAnalysis"),
-    .executableTarget(name: "RideAnalyzer", dependencies: ["RideAnalysis"], path: "Scripts/RideAnalyzer", exclude: ["README.md"]),
-    .executableTarget(name: "RideWeb", dependencies: ["RideAnalysis", .product(name: "Hummingbird", package: "hummingbird")], path: "Scripts/RideWeb", exclude: ["README.md"], resources: [.copy("index.html")]),
-    .testTarget(name: "RideAnalyzerTests", dependencies: ["RideAnalysis"], path: "Tests/RideAnalyzerTests"),
+    .target(name: "RideAnalysis", dependencies: [.product(name: "SwiftFit", package: "swift-fit")]),
+    .executableTarget(name: "RideAnalyzer", dependencies: ["RideAnalysis"], exclude: ["README.md"]),
+    .executableTarget(
+      name: "RideWeb", dependencies: ["RideAnalysis", .product(name: "Hummingbird", package: "hummingbird")],
+      exclude: ["README.md"], resources: [.copy("index.html")]),
+    .testTarget(name: "RideAnalyzerTests", dependencies: ["RideAnalysis"]),
     .executableTarget(
       name: "UnaDev",
-      dependencies: [.product(name: "Subprocess", package: "swift-subprocess")],
-      path: "Scripts/UnaDev"
+      dependencies: [.product(name: "Subprocess", package: "swift-subprocess")]
     ),
     .executableTarget(
       name: "RideDecoder",
-      dependencies: [.product(name: "SwiftFit", package: "swift-fit")],
-      path: "Scripts/RideDecoder"
+      dependencies: [.product(name: "SwiftFit", package: "swift-fit")]
     ),
     .testTarget(
       name: "RideDecoderTests",
-      dependencies: ["RideDecoder", .product(name: "SwiftFit", package: "swift-fit")],
-      path: "Tests/RideDecoderTests"
+      dependencies: ["RideDecoder", .product(name: "SwiftFit", package: "swift-fit")]
     ),
-    .testTarget(name: "UnaDevTests", dependencies: ["UnaDev"], path: "Tests/UnaDevTests"),
+    .testTarget(name: "UnaDevTests", dependencies: ["UnaDev"]),
   ]
 )

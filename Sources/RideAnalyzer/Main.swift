@@ -1,5 +1,5 @@
-import RideAnalysis
 import Foundation
+import RideAnalysis
 
 @main
 struct RideAnalyzer {
@@ -16,7 +16,8 @@ struct RideAnalyzer {
       guard let anchor = clocks.first else { throw AnalysisError(description: "No valid UTC anchor") }
       let offset = anchor.values[0] * 65536 + anchor.values[1] - anchor.time
       let residuals = clocks.map { $0.values[0] * 65536 + $0.values[1] - $0.time - offset }
-      print(String(format: "Clock anchor drift range: %.2f to %.2f seconds", residuals.min() ?? 0, residuals.max() ?? 0))
+      print(
+        String(format: "Clock anchor drift range: %.2f to %.2f seconds", residuals.min() ?? 0, residuals.max() ?? 0))
       let formatter = DateFormatter()
       formatter.timeZone = TimeZone(identifier: "America/Denver")
       formatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS z"
@@ -25,7 +26,10 @@ struct RideAnalyzer {
         let total = intervals.reduce(0) { $0 + $1.end - $1.start }
         print(String(format: "%@: %d candidates, %.2f seconds", name, intervals.count, total))
         for interval in intervals {
-          print(String(format: "  %@ → %@ (%.2f s)", timestamp(interval.start), timestamp(interval.end), interval.end - interval.start))
+          print(
+            String(
+              format: "  %@ → %@ (%.2f s)", timestamp(interval.start), timestamp(interval.end),
+              interval.end - interval.start))
         }
       }
       let lifts = classify(locations, ascending: true)
@@ -40,13 +44,18 @@ struct RideAnalyzer {
       print("Sensor timestamps are assumed aligned across streams; UTC labels assume alignment with uptime anchors.")
       for threshold in [0.25, 0.35, 0.45] {
         let candidates = flights(acceleration, downhill: downhill, gravity: gravity, threshold: threshold)
-        if threshold == 0.35 { report("Jump low-force airtime estimate (0.35 g)", candidates) }
-        else {
-          print(String(format: "Sensitivity at %.2f g: %d candidates, %.2f seconds", threshold,
-            candidates.count, candidates.reduce(0) { $0 + $1.end - $1.start }))
+        if threshold == 0.35 {
+          report("Jump low-force airtime estimate (0.35 g)", candidates)
+        } else {
+          print(
+            String(
+              format: "Sensitivity at %.2f g: %d candidates, %.2f seconds", threshold,
+              candidates.count, candidates.reduce(0) { $0 + $1.end - $1.start }))
         }
       }
-      print("Not confirmed wheel-off-ground time: wrist motion can create false positives or hide flight. Unclassified terrain and sensor gaps are excluded.")
+      print(
+        "Not confirmed wheel-off-ground time: wrist motion can create false positives or hide flight. Unclassified terrain and sensor gaps are excluded."
+      )
     } catch {
       try? FileHandle.standardError.write(contentsOf: Data("\(error)\n".utf8))
       exit(1)

@@ -62,27 +62,27 @@ add_custom_command(OUTPUT ${SWIFT_OBJECT}
         -Xfrontend -function-sections -Xfrontend -disable-stack-protector
         -Xcc -mcpu=cortex-m33 -Xcc -mfpu=fpv5-sp-d16 -Xcc -mfloat-abi=hard
         -parse-as-library -emit-object
-        ${CMAKE_CURRENT_SOURCE_DIR}/Sources/RideSample.swift
+        ${CMAKE_CURRENT_SOURCE_DIR}/Sources/RideSample/RideSample.swift
         -o ${SWIFT_OBJECT}
     # Compiler module fingerprint is not runtime data and is not packaged by UNA.
     COMMAND ${ARM_OBJCOPY} --remove-section=.swift_modhash ${SWIFT_OBJECT}
-    DEPENDS Sources/RideSample.swift
+    DEPENDS Sources/RideSample/RideSample.swift
     VERBATIM)
 set_source_files_properties(${SWIFT_OBJECT} PROPERTIES EXTERNAL_OBJECT TRUE GENERATED TRUE)
 
 set(BUILD_VERSION "1.0.0")
 set(SERVICE_SOURCES
     ${FIRMWARE_SYMBOL_FILE}
-    Sources/Service.cpp
-    Sources/RideLogger.cpp
-    Sources/RideFitWriter.cpp
+    Sources/UnaApp/Service.cpp
+    Sources/UnaApp/RideLogger.cpp
+    Sources/UnaApp/RideFitWriter.cpp
     ${SWIFT_OBJECT}
     ${UNA_SDK_SOURCES_COMMON}
     ${UNA_SDK_SOURCES_SENSOR}
     ${UNA_SDK_SOURCES_FIT}
     ${UNA_SDK_SOURCES_APPSYSTEM})
 set(SERVICE_INCLUDE_DIRS
-    Sources
+    Sources/UnaApp
     ${UNA_SDK_INCLUDE_DIRS_COMMON}
     ${UNA_SDK_INCLUDE_DIRS_SERVICE})
 una_app_build_service(${APP_NAME}Service.elf)
@@ -92,10 +92,10 @@ target_link_options(${APP_NAME}Service.elf PRIVATE -Wl,--no-enum-size-warning -W
 
 set(GUI_SOURCES
     ${FIRMWARE_SYMBOL_FILE}
-    Sources/Gui.cpp
+    Sources/UnaApp/Gui.cpp
     ${UNA_SDK_SOURCES_COMMON}
     ${CMAKE_CURRENT_SOURCE_DIR}/una-sdk/Libs/Source/AppSystem/EntryPoint/CustomGUI/main.cpp)
-set(GUI_INCLUDE_DIRS Sources ${UNA_SDK_INCLUDE_DIRS_COMMON} ${UNA_SDK_INCLUDE_DIRS_SERVICE})
+set(GUI_INCLUDE_DIRS Sources/UnaApp ${UNA_SDK_INCLUDE_DIRS_COMMON} ${UNA_SDK_INCLUDE_DIRS_SERVICE})
 una_app_build_gui(${APP_NAME}GUI.elf)
 target_link_options(${APP_NAME}GUI.elf PRIVATE -Wl,-z,noexecstack)
 
